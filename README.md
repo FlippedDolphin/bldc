@@ -8,6 +8,15 @@
 [![Stars](https://img.shields.io/github/stars/vedderb/bldc.svg)](https://github.com/vedderb/bldc/stargazers)
 [![Forks](https://img.shields.io/github/forks/vedderb/bldc.svg)](https://github.com/vedderb/bldc/network/members)
 
+
+***** caution *******
+
+This is a custom vesc firmware for Custom CFOC2 vesc board for OpenFFBoard.
+Target is "Cheap_FOCer_2_005_nl".
+
+***** caution *******
+
+
 An open source motor controller firmware.
 
 This is the source code for the VESC DC/BLDC/FOC controller. Read more at
