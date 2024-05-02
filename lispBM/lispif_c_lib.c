@@ -17,9 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma GCC push_options
-#pragma GCC optimize ("Os")
-
 #include "ch.h"
 #include "hal.h"
 #include "hw.h"
@@ -43,7 +40,7 @@
 #include "encoder.h"
 #include "conf_general.h"
 #include "servo_dec.h"
-#include "pwm_servo.h"
+#include "servo_simple.h"
 #include "flash_helper.h"
 #include "mcpwm_foc.h"
 
@@ -94,7 +91,7 @@ static THD_FUNCTION(lib_thd, arg) {
 	lbm_free(t);
 }
 
-lib_thread lispif_spawn(void (*func)(void*), size_t stack_size, char *name, void *arg) {
+static lib_thread lib_spawn(void (*func)(void*), size_t stack_size, char *name, void *arg) {
 	if (!utils_is_func_valid(func)) {
 		commands_printf_lisp("Invalid function address. Make sure that the function is static.");
 		return 0;
@@ -240,18 +237,6 @@ static bool get_gpio(VESC_PIN io, stm32_gpio_t **port, uint32_t *pin, bool *is_a
 	case VESC_PIN_PPM:
 #ifdef HW_ICU_GPIO
 		*port = HW_ICU_GPIO; *pin = HW_ICU_PIN;
-		res = true;
-#endif
-		break;
-	case VESC_PIN_HW_1:
-#ifdef PIN_HW_1
-		*port = PIN_HW_1_GPIO; *pin = PIN_HW_1;
-		res = true;
-#endif
-		break;
-	case VESC_PIN_HW_2:
-#ifdef PIN_HW_2
-		*port = PIN_HW_2_GPIO; *pin = PIN_HW_2;
 		res = true;
 #endif
 		break;
@@ -565,7 +550,7 @@ static bool lib_store_cfg(void) {
 }
 
 static bool lib_create_byte_array(lbm_value *value, lbm_uint num_elt) {
-	return lbm_heap_allocate_array(value, num_elt);
+	return lbm_heap_allocate_array(value, num_elt, LBM_TYPE_BYTE);
 }
 
 static bool lib_eval_is_paused(void) {
@@ -601,41 +586,27 @@ static float lib_get_ppm_age(void) {
 	return (float)servodec_get_time_since_update() / 1000.0;
 }
 
-static bool lib_add_extension(char *sym_str, extension_fptr ext) {
-	if (sym_str[0] != 'e' ||
-			sym_str[1] != 'x' ||
-			sym_str[2] != 't' ||
-			sym_str[3] != '-') {
-		commands_printf_lisp("Error: Extensions must start with ext-");
-		return false;
-	}
-
-	return lbm_add_extension(sym_str, ext);
-}
-
-static int lib_lbm_set_error_reason(char *str) {
-	lbm_set_error_reason(str);
-	return 1;
-}
-
 lbm_value ext_load_native_lib(lbm_value *args, lbm_uint argn) {
 	lbm_value res = lbm_enc_sym(SYM_EERROR);
 
-	if (argn != 1 || !lbm_is_array_r(args[0])) {
+	if (argn != 1 || !lbm_is_array(args[0])) {
 		return res;
 	}
 
 	lbm_array_header_t *array = (lbm_array_header_t *)lbm_car(args[0]);
+	if (array->elt_type != LBM_TYPE_BYTE) {
+		return res;
+	}
 
 	if (!lib_init_done) {
 		memset((char*)cif.pad, 0, 2048);
 
 		// LBM
-		cif.cif.lbm_add_extension = lib_add_extension;
+		cif.cif.lbm_add_extension = lbm_add_extension;
 		cif.cif.lbm_block_ctx_from_extension = lbm_block_ctx_from_extension;
 		cif.cif.lbm_unblock_ctx = lbm_unblock_ctx;
 		cif.cif.lbm_get_current_cid = lbm_get_current_cid;
-		cif.cif.lbm_set_error_reason = lib_lbm_set_error_reason;
+		cif.cif.lbm_set_error_reason = lbm_set_error_reason;
 		cif.cif.lbm_pause_eval_with_gc = lbm_pause_eval_with_gc;
 		cif.cif.lbm_continue_eval = lbm_continue_eval;
 		cif.cif.lbm_send_message = lbm_send_message;
@@ -665,7 +636,7 @@ lbm_value ext_load_native_lib(lbm_value *args, lbm_uint argn) {
 		cif.cif.lbm_dec_str = lbm_dec_str;
 		cif.cif.lbm_dec_sym = lbm_dec_sym;
 
-		cif.cif.lbm_is_byte_array = lbm_is_array_r;
+		cif.cif.lbm_is_byte_array = lbm_is_byte_array;
 		cif.cif.lbm_is_cons = lbm_is_cons;
 		cif.cif.lbm_is_number = lbm_is_number;
 		cif.cif.lbm_is_char = lbm_is_char;
@@ -688,7 +659,7 @@ lbm_value ext_load_native_lib(lbm_value *args, lbm_uint argn) {
 		cif.cif.printf = commands_printf_lisp;
 		cif.cif.malloc = lbm_malloc_reserve;
 		cif.cif.free = lbm_free;
-		cif.cif.spawn = lispif_spawn;
+		cif.cif.spawn = lib_spawn;
 		cif.cif.request_terminate = lib_request_terminate;
 		cif.cif.should_terminate = lib_should_terminate;
 		cif.cif.get_arg = lib_get_arg;
@@ -913,39 +884,10 @@ lbm_value ext_load_native_lib(lbm_value *args, lbm_uint argn) {
 		cif.cif.foc_get_iq = mcpwm_foc_get_iq_filter;
 		cif.cif.foc_get_vd = mcpwm_foc_get_vd;
 		cif.cif.foc_get_vq = mcpwm_foc_get_vq;
-		cif.cif.foc_set_openloop_current = mc_interface_set_openloop_current;
-		cif.cif.foc_set_openloop_phase = mc_interface_set_openloop_phase;
-		cif.cif.foc_set_openloop_duty = mc_interface_set_openloop_duty;
-		cif.cif.foc_set_openloop_duty_phase = mc_interface_set_openloop_duty_phase;
-
-		// Flat values
-		cif.cif.lbm_start_flatten = lbm_start_flatten;
-		cif.cif.lbm_finish_flatten = lbm_finish_flatten;
-		cif.cif.f_b = f_b;
-		cif.cif.f_cons = f_cons;
-		cif.cif.f_float = f_float;
-		cif.cif.f_i = f_i;
-		cif.cif.f_i32 = f_i32;
-		cif.cif.f_i64 = f_i64;
-		cif.cif.f_lbm_array = f_lbm_array;
-		cif.cif.f_sym = f_sym;
-		cif.cif.f_u32 = f_u32;
-		cif.cif.f_u64 = f_u64;
-
-		// Unblock unboxed
-		cif.cif.lbm_unblock_ctx_unboxed = lbm_unblock_ctx_unboxed;
-
-		// System time
-		cif.cif.system_time_ticks = chVTGetSystemTimeX;
-		cif.cif.sleep_ticks = chThdSleep;
-
-		// FOC Audio
-		cif.cif.foc_beep = mcpwm_foc_beep;
-		cif.cif.foc_play_tone = mcpwm_foc_play_tone;
-		cif.cif.foc_stop_audio = mcpwm_foc_stop_audio;
-		cif.cif.foc_set_audio_sample_table = mcpwm_foc_set_audio_sample_table;
-		cif.cif.foc_get_audio_sample_table = mcpwm_foc_get_audio_sample_table;
-		cif.cif.foc_play_audio_samples = mcpwm_foc_play_audio_samples;
+		cif.cif.foc_set_openloop_current = mcpwm_foc_set_openloop_current;
+		cif.cif.foc_set_openloop_phase = mcpwm_foc_set_openloop_phase;
+		cif.cif.foc_set_openloop_duty = mcpwm_foc_set_openloop_duty;
+		cif.cif.foc_set_openloop_duty_phase = mcpwm_foc_set_openloop_duty_phase;
 
 		lib_init_done = true;
 	}
@@ -989,11 +931,15 @@ lbm_value ext_load_native_lib(lbm_value *args, lbm_uint argn) {
 lbm_value ext_unload_native_lib(lbm_value *args, lbm_uint argn) {
 	lbm_value res = lbm_enc_sym(SYM_EERROR);
 
-	if (argn != 1 || !lbm_is_array_r(args[0])) {
+	if (argn != 1 || !lbm_is_array(args[0])) {
 		return res;
 	}
 
 	lbm_array_header_t *array = (lbm_array_header_t *)lbm_car(args[0]);
+	if (array->elt_type != LBM_TYPE_BYTE) {
+		return res;
+	}
+
 	uint32_t addr = (uint32_t)array->data;
 
 	bool ok = false;
@@ -1032,7 +978,7 @@ void lispif_stop_lib(void) {
 
 float lispif_get_ppm(void) {
 	if (!servodec_is_running()) {
-		pwm_servo_stop();
+		servo_simple_stop();
 		servodec_init(0);
 	}
 
@@ -1051,5 +997,3 @@ float lispif_get_ppm(void) {
 
 	return servo_val;
 }
-
-#pragma GCC pop_options

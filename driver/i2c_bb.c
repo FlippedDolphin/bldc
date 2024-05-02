@@ -53,8 +53,8 @@ static inline float rate2secs(i2c_bb_state *s) {
 
 void i2c_bb_init(i2c_bb_state *s) {
 	chMtxObjectInit(&s->mutex);
-	palSetPadMode(s->sda_gpio, s->sda_pin, PAL_MODE_OUTPUT_OPENDRAIN | PAL_STM32_PUDR_PULLUP);
-	palSetPadMode(s->scl_gpio, s->scl_pin, PAL_MODE_OUTPUT_OPENDRAIN | PAL_STM32_PUDR_PULLUP);
+	palSetPadMode(s->sda_gpio, s->sda_pin, PAL_MODE_OUTPUT_OPENDRAIN);
+	palSetPadMode(s->scl_gpio, s->scl_pin, PAL_MODE_OUTPUT_OPENDRAIN);
 	s->has_started = false;
 	s->has_error = false;
 }
@@ -87,38 +87,17 @@ void i2c_bb_restore_bus(i2c_bb_state *s) {
 bool i2c_bb_tx_rx(i2c_bb_state *s, uint16_t addr, uint8_t *txbuf, size_t txbytes, uint8_t *rxbuf, size_t rxbytes) {
 	chMtxLock(&s->mutex);
 
-	if (txbytes > 0 && txbuf) {
-		i2c_write_byte(s, true, false, addr << 1);
+	i2c_write_byte(s, true, false, addr << 1);
 
-		if (s->has_error) {
-			chMtxUnlock(&s->mutex);
-			return false;
-		}
-
-		for (unsigned int i = 0;i < txbytes;i++) {
-			i2c_write_byte(s, false, false, txbuf[i]);
-
-			if (s->has_error) {
-				chMtxUnlock(&s->mutex);
-				return false;
-			}
-		}
+	for (unsigned int i = 0;i < txbytes;i++) {
+		i2c_write_byte(s, false, false, txbuf[i]);
 	}
 
 	if (rxbytes > 0) {
 		i2c_write_byte(s, true, false, addr << 1 | 1);
 
-		if (s->has_error) {
-			chMtxUnlock(&s->mutex);
-			return false;
-		}
-
 		for (unsigned int i = 0;i < rxbytes;i++) {
 			rxbuf[i] = i2c_read_byte(s, i == (rxbytes - 1), false);
-			if (s->has_error) {
-				chMtxUnlock(&s->mutex);
-				return false;
-			}
 		}
 	}
 

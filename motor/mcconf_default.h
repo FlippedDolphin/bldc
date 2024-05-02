@@ -47,12 +47,6 @@
 #ifndef MCCONF_L_IN_CURRENT_MIN
 #define MCCONF_L_IN_CURRENT_MIN			-60.0	// Input current limit in Amperes (Lower)
 #endif
-#ifndef MCCONF_L_IN_CURRENT_MAP_START
-#define MCCONF_L_IN_CURRENT_MAP_START	1.0		// Input current to Q axis current limit map start
-#endif
-#ifndef MCCONF_L_IN_CURRENT_MAP_FILTER
-#define MCCONF_L_IN_CURRENT_MAP_FILTER	0.005	// Input current filter for the mapped limit
-#endif
 #ifndef MCCONF_L_MAX_ABS_CURRENT
 #define MCCONF_L_MAX_ABS_CURRENT		130.0	// The maximum absolute current above which a fault is generated
 #endif
@@ -67,12 +61,6 @@
 #endif
 #ifndef MCCONF_L_BATTERY_CUT_END
 #define MCCONF_L_BATTERY_CUT_END		8.0		// Limit the positive current completely at this voltage
-#endif
-#ifndef MCCONF_L_BATTERY_REGEN_CUT_START
-#define MCCONF_L_BATTERY_REGEN_CUT_START    1000.0	// Start limiting the regen current at this voltage
-#endif
-#ifndef MCCONF_L_BATTERY_REGEN_CUT_END
-#define MCCONF_L_BATTERY_REGEN_CUT_END  1100.0		// Limit the regen current completely at this voltage
 #endif
 #ifndef MCCONF_L_RPM_MAX
 #define MCCONF_L_RPM_MAX				100000.0	// The motor speed limit (Upper)
@@ -155,9 +143,6 @@
 #endif
 #ifndef MCCONF_S_PID_RAMP_ERPMS_S
 #define MCCONF_S_PID_RAMP_ERPMS_S		25000.0	// Speed input ramping, in ERPM/s
-#endif
-#ifndef MCCONF_S_PID_SPEED_SOURCE
-#define MCCONF_S_PID_SPEED_SOURCE		S_PID_SPEED_SRC_PLL
 #endif
 
 // Position PID parameters
@@ -373,17 +358,14 @@
 #ifndef MCCONF_FOC_HALL_INTERP_ERPM
 #define MCCONF_FOC_HALL_INTERP_ERPM		500		// Do not interpolate hall sensors below this ERPM
 #endif
-#ifndef MCCONF_FOC_SL_ERPM_START
-#define MCCONF_FOC_SL_ERPM_START		2500.0	// ERPM below which only sensored commutation is used
-#endif
 #ifndef MCCONF_FOC_SL_ERPM
-#define MCCONF_FOC_SL_ERPM				3500.0	// ERPM above which only the observer is used
+#define MCCONF_FOC_SL_ERPM				2500.0	// ERPM above which only the observer is used
 #endif
-#ifndef MCCONF_FOC_CONTROL_SAMPLE_MODE
-#define MCCONF_FOC_CONTROL_SAMPLE_MODE	FOC_CONTROL_SAMPLE_MODE_V0
+#ifndef MCCONF_FOC_SAMPLE_V0_V7
+#define MCCONF_FOC_SAMPLE_V0_V7			false	// Run control loop in both v0 and v7 (requires phase shunts)
 #endif
-#ifndef MCCONF_FOC_CURRENT_SAMPLE_MODE
-#define MCCONF_FOC_CURRENT_SAMPLE_MODE	FOC_CURRENT_SAMPLE_MODE_LONGEST_ZERO
+#ifndef MCCONF_FOC_SAMPLE_HIGH_CURRENT
+#define MCCONF_FOC_SAMPLE_HIGH_CURRENT	false	// High current sampling mode (requires three shunts)
 #endif
 #ifndef MCCONF_FOC_SAT_COMP_MODE
 #define MCCONF_FOC_SAT_COMP_MODE		SAT_COMP_LAMBDA		// Stator saturation compensation mode
@@ -414,9 +396,6 @@
 #endif
 #ifndef MCCONF_FOC_HFI_GAIN
 #define MCCONF_FOC_HFI_GAIN				0.3 // Correction gain for HFI V2
-#endif
-#ifndef MCCONF_FOC_HFI_MAX_ERR
-#define MCCONF_FOC_HFI_MAX_ERR			0.15 // Truncate HFI error at this value
 #endif
 #ifndef MCCONF_FOC_HFI_HYST
 #define MCCONF_FOC_HFI_HYST				0.0 // Sense vector offset hysteresis for HFI V2
@@ -491,7 +470,7 @@
 #define MCCONF_FOC_FW_Q_CURRENT_FACTOR	0.02 // Factor of the FW-current to feed to the Q-axis to slow motor down when setting 0 current
 #endif
 #ifndef MCCONF_FOC_SPEED_SOURCE
-#define MCCONF_FOC_SPEED_SOURCE			FOC_SPEED_SRC_CORRECTED // Position source for speed trackers
+#define MCCONF_FOC_SPEED_SOURCE			SPEED_SRC_OBSERVER // Position source for speed trackers
 #endif
 
 // GPD
@@ -582,7 +561,7 @@
 #define MCCONF_M_NTCX_PTCX_BASE_TEMP	25.0 // Custom NTC/PTC base temperature
 #endif
 #ifndef MCCONF_M_HALL_EXTRA_SAMPLES
-#define MCCONF_M_HALL_EXTRA_SAMPLES		3 // Extra samples for filtering when reading hall sensors
+#define MCCONF_M_HALL_EXTRA_SAMPLES		1 // Extra samples for filtering when reading hall sensors
 #endif
 #ifndef MCCONF_M_BATT_FILTER_CONST
 #define MCCONF_M_BATT_FILTER_CONST		45 // Battery level filter constant

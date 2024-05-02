@@ -15,12 +15,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
     */
 
-#ifndef HW_75_100_V2_005OHM_H_
-#define HW_75_100_V2_005OHM_H_
+#ifndef HW_75_100_V2_0005OHM_H_
+#define HW_75_100_V2_0005OHM_H_
 
+#define DISABLE_HW_LIMITS
 #define HW_SOURCE_ALT 		"flipsky/hw_75_100_V2.c"
 #define CURRENT_SHUNT_RES	0.005
 
 #include "hw_75_100_V2.h"
 
-#endif /* HW_75_100_V2_005OHM_H_ */
+#endif /* HW_75_100_V2_0005OHM_H_ */

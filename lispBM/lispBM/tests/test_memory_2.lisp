@@ -8,17 +8,14 @@
       )))
 
 
-
-(defun f () {
-       (def n (* 4 (mem-longest-free)))
-       (repeat 100 (fn () (bufcreate (- n 2000))))
-       })
+(def n (* 4 (mem-longest-free)))
+(defun f () (repeat 100 (fn () (array-create (- n 1500)))))
 
 
 
 (spawn-trap f)
 
 
-(check (eq (recv ((exit-error (? tid) (? e)) 'error)
-                 ((exit-ok    (? tid) (? r)) r))
-           'repeat-done))
+(eq (recv ((exit-error (? tid) (? e)) 'error)
+         ((exit-ok    (? tid) (? r)) r))
+   'repeat-done)

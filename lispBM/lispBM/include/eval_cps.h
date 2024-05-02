@@ -27,29 +27,20 @@
 extern "C" {
 #endif
 
-#define EVAL_CPS_STATE_NONE    0
+#define EVAL_CPS_STATE_INIT    0
 #define EVAL_CPS_STATE_PAUSED  1
 #define EVAL_CPS_STATE_RUNNING 2
+#define EVAL_CPS_STATE_STEP    3
 #define EVAL_CPS_STATE_KILL    4
-#define EVAL_CPS_STATE_DEAD    8
 
 #define EVAL_CPS_DEFAULT_MAILBOX_SIZE 10
 
-#define EVAL_CPS_CONTEXT_FLAG_NOTHING               (uint32_t)0x0
-#define EVAL_CPS_CONTEXT_FLAG_TRAP                  (uint32_t)0x1
-#define EVAL_CPS_CONTEXT_FLAG_CONST                 (uint32_t)0x2
-#define EVAL_CPS_CONTEXT_FLAG_CONST_SYMBOL_STRINGS  (uint32_t)0x4
-#define EVAL_CPS_CONTEXT_FLAG_INCREMENTAL_READ      (uint32_t)0x8
-
+#define EVAL_CPS_CONTEXT_FLAG_NOTHING       (uint32_t)0x0
+#define EVAL_CPS_CONTEXT_FLAG_TRAP          (uint32_t)0x1
+  
 /** The eval_context_t struct represents a lispbm process.
  *
  */
-#define LBM_THREAD_STATE_READY     (uint32_t)0
-#define LBM_THREAD_STATE_BLOCKED   (uint32_t)1
-#define LBM_THREAD_STATE_TIMEOUT   (uint32_t)2
-#define LBM_THREAD_STATE_SLEEPING  (uint32_t)3
-#define LBM_THREAD_STATE_GC_BIT    (uint32_t)(1 << 31)
-
 typedef struct eval_context_s{
   lbm_value program;
   lbm_value curr_exp;
@@ -60,17 +51,13 @@ typedef struct eval_context_s{
   uint32_t  flags;
   lbm_value r;
   char *error_reason;
+  bool  done;
   bool  app_cont;
   lbm_stack_t K;
   lbm_uint timestamp;
   lbm_uint sleep_us;
-  uint32_t state;
-  char *name;
   lbm_cid id;
   lbm_cid parent;
-  /* while reading */
-  lbm_int row0;
-  lbm_int row1;
   /* List structure */
   struct eval_context_s *prev;
   struct eval_context_s *next;
@@ -79,14 +66,13 @@ typedef struct eval_context_s{
 typedef enum {
   LBM_EVENT_FOR_HANDLER = 0,
   LBM_EVENT_UNBLOCK_CTX,
-  LBM_EVENT_DEFINE,
 } lbm_event_type_t;
 
 typedef struct {
   lbm_event_type_t type;
   lbm_uint parameter;
   lbm_uint buf_ptr;
-  lbm_uint buf_len;
+  uint32_t  buf_len;
 } lbm_event_t;
 
 /** Fundamental operation type */
@@ -137,7 +123,6 @@ void lbm_set_event_handler_pid(lbm_cid pid);
  * \return True if event handler exists, otherwise false.
  */
 bool lbm_event_handler_exists(void);
-bool lbm_event_define(lbm_value key, lbm_flat_value_t *fv);
 /** Send an event to the registered event handler process.
  * If lbm_event returns false the C code will still be responsible for
  * the flat_value passed into lbm_event. If lbm_event returns true,
@@ -154,10 +139,6 @@ bool lbm_event(lbm_flat_value_t *fv);
  * \return true on success.
  */
 bool lbm_event_unboxed(lbm_value unboxed);
-/** Check if the event queue is empty.
- * \return true if event queue is empty, otherwise false.
- */
-bool lbm_event_queue_is_empty(void);
 /** Remove a context that has finished executing and free up its associated memory.
  *
  * \param cid Context id of context to free.
@@ -227,38 +208,23 @@ uint32_t lbm_get_eval_state(void);
  *  and will in that case be freed when the context
  *  that errored is removed.
  * \param error_str
+ * \return 1 on success and 0 on failure.
  */
-void lbm_set_error_reason(char *error_str);
-/** Provide the expression that is most suspicious
- *  in relation to the error at hand.
- * \param lbm_value
- */
-void lbm_set_error_suspect(lbm_value suspect);
-/** Terminate the runtime system in response to an
-  *  error that it is not possible to recover from.
-  */
-void lbm_critical_error(void);
-/** Set the critical error callback */
-void lbm_set_critical_error_callback(void (*fptr)(void));
+int lbm_set_error_reason(char *error_str);
 /** Create a context and enqueue it as runnable.
  *
  * \param program The program to evaluate in the context.
  * \param env An initial environment.
  * \param stack_size Stack size for the context.
- * \param name Name of thread or NULL.
  * \return
  */
-lbm_cid lbm_create_ctx(lbm_value program, lbm_value env, lbm_uint stack_size, char *name);
+lbm_cid lbm_create_ctx(lbm_value program, lbm_value env, lbm_uint stack_size);
 /** Block a context from an extension
  */
 void lbm_block_ctx_from_extension(void);
-/** Block a context from an extension with a timeout.
- * \param s Timeout in seconds.
- */
-void lbm_block_ctx_from_extension_timeout(float s);
-/** Undo a previous call to lbm_block_ctx_from_extension.
- */
-void lbm_undo_block_ctx_from_extension(void);
+  /** Undo a previous call to lbm_block_ctx_from_extension.
+   */
+  void lbm_undo_block_ctx_from_extension(void);
 /** Unblock a context that has been blocked by a C extension
  *  Trying to unblock a context that is waiting on a message
  *  in a mailbox is not encouraged
@@ -288,6 +254,13 @@ void lbm_running_iterator(ctx_fun f, void*, void*);
  * \param arg2 Same as above
  */
 void lbm_blocked_iterator(ctx_fun f, void*, void*);
+/** Iterate over all done contexts and apply function on each context.
+ *
+ * \param f Function to apply to each context.
+ * \param arg1 Pointer argument that can be used to convey information back to user.
+ * \param arg2 Same as above
+ */
+void lbm_sleeping_iterator(ctx_fun f, void *, void *);
 /** toggle verbosity level of error messages
  */
 void lbm_toggle_verbose(void);
@@ -322,6 +295,10 @@ void lbm_set_printf_callback(int (*prnt)(const char*, ...));
  * an undefined symbol
  */
 void lbm_set_dynamic_load_callback(bool (*fptr)(const char *, const char **));
+/** Set a callback that is run when reading source is finishes
+ *  within a context
+ */
+void lbm_set_reader_done_callback(void (*fptr)(lbm_cid));
 /** Get the CID of the currently executing context.
  *  Should be called from an extension where there is
  *  a guarantee that a context is running
@@ -344,9 +321,6 @@ bool lbm_mailbox_change_size(eval_context_t *ctx, lbm_uint new_size);
 bool create_string_channel(char *str, lbm_value *res);
 
 bool lift_char_channel(lbm_char_channel_t *ch, lbm_value *res);
-
-lbm_flash_status request_flash_storage_cell(lbm_value val, lbm_value *res);
-  //bool lift_array_flash(lbm_value flash_cell, char *data, lbm_uint num_elt);
 
 /** deliver a message
  *

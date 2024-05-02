@@ -1,0 +1,3 @@
+REM make 410 410_005ohm 410_no_limits 75_100 75_100_005ohm 75_100_no_limits 75_100_V2 75_100_V2_005ohm 75_100_V2_no_limits Cheap_FOCer_2_005_nl
+make Cheap_FOCer_2_005_nl
+rem

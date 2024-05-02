@@ -24,9 +24,6 @@
  * this module to interpret CAN-messages from it properly.
  */
 
-#pragma GCC push_options
-#pragma GCC optimize ("Os")
-
 #include "bms.h"
 #include "buffer.h"
 #include "utils_math.h"
@@ -270,9 +267,6 @@ bool bms_process_can_frame(uint32_t can_id, uint8_t *data8, int len, bool is_ext
 					m_values.temp_hum = buffer_get_float16(data8, 1e2, &ind);
 					m_values.hum = buffer_get_float16(data8, 1e2, &ind);
 					m_values.temp_ic = buffer_get_float16(data8, 1e2, &ind);
-					if (len == 8) {
-						m_values.pressure = buffer_get_float16(data8, 1e-1, &ind);
-					}
 				}
 			} break;
 
@@ -357,8 +351,9 @@ void bms_update_limits(float *i_in_min, float *i_in_max,
 		}
 	}
 
+	// TODO: add support for conf->l_temp_accel_dec to still have braking.
+
 	// SOC
-	float i_in_max_bms_soc = i_in_max_conf;
 	if ((m_conf.limit_mode >> 1) & 1) {
 		if (m_stat_soc_min.id >= 0 && UTILS_AGE_S(m_stat_soc_min.rx_time) < MAX_CAN_AGE_SEC) {
 			float soc = m_stat_soc_min.soc;
@@ -366,17 +361,13 @@ void bms_update_limits(float *i_in_min, float *i_in_max,
 			if (soc > (m_conf.soc_limit_start - 0.001)) {
 				// OK
 			} else if (soc < (m_conf.soc_limit_end + 0.001)) {
-				i_in_max_bms_soc = 0.0;
+				i_in_max_bms = 0.0;
 			} else {
-				i_in_max_bms_soc = utils_map(soc, m_conf.soc_limit_start,
+				i_in_max_bms = utils_map(soc, m_conf.soc_limit_start,
 						m_conf.soc_limit_end, i_in_max_conf, 0.0);
 			}
 		}
 	}
-
-	i_in_max_bms = utils_min_abs(i_in_max_bms, i_in_max_bms_soc);
-
-	// TODO: add support for conf->l_temp_accel_dec to still have braking.
 
 	if (fabsf(i_in_min_bms) < fabsf(*i_in_min)) {
 		*i_in_min = i_in_min_bms;
@@ -446,9 +437,6 @@ void bms_process_cmd(unsigned char *data, unsigned int len,
 		buffer_append_float32_auto(send_buffer, m_values.wh_cnt_chg_total, &ind);
 		buffer_append_float32_auto(send_buffer, m_values.ah_cnt_dis_total, &ind);
 		buffer_append_float32_auto(send_buffer, m_values.wh_cnt_dis_total, &ind);
-
-		// Pressure
-		buffer_append_float16(send_buffer, m_values.pressure, 1e-1, &ind);
 
 		reply_func(send_buffer, ind);
 	} break;
@@ -561,7 +549,6 @@ void bms_send_status_can(void) {
 	buffer_append_float16(buffer, m_values.temp_hum, 1e2, &send_index);
 	buffer_append_float16(buffer, m_values.hum, 1e2, &send_index);
 	buffer_append_float16(buffer, m_values.temp_ic, 1e2, &send_index); // Put IC temp here instead of making mew msg
-	buffer_append_float16(buffer, m_values.pressure, 1e-1, &send_index);
 	comm_can_transmit_eid(id | ((uint32_t)CAN_PACKET_BMS_HUM << 8), buffer, send_index);
 
 	/*
@@ -595,5 +582,3 @@ void bms_send_status_can(void) {
 	buffer_append_float32_auto(buffer, m_values.wh_cnt_dis_total, &send_index);
 	comm_can_transmit_eid(id | ((uint32_t)CAN_PACKET_BMS_AH_WH_DIS_TOTAL << 8), buffer, send_index);
 }
-
-#pragma GCC pop_options

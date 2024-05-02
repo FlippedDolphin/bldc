@@ -4,7 +4,6 @@
 
 
 [Language reference](./lbmref.md)
-[Gotchas and caveats](./gotchas.md)
 
 
 ## Programming manual

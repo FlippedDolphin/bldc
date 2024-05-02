@@ -43,16 +43,12 @@ static size_t strlen_max(const char *s, size_t maxlen) {
 }
 
 static lbm_value ext_str_from_n(lbm_value *args, lbm_uint argn) {
-  if (argn != 1 && argn != 2) {
-    lbm_set_error_reason((char*)lbm_error_str_num_args);
+  if ((argn != 1 && argn != 2) || !lbm_is_number(args[0])) {
     return ENC_SYM_EERROR;
   }
-  if (!lbm_is_number(args[0])) {
-    return ENC_SYM_TERROR;
-  }
 
-  if (argn == 2 && !lbm_is_array_r(args[1])) {
-    return ENC_SYM_TERROR;
+  if (argn == 2 && lbm_type_of(args[1]) != LBM_TYPE_ARRAY) {
+    return ENC_SYM_EERROR;
   }
 
   char *format = 0;
@@ -84,7 +80,7 @@ static lbm_value ext_str_from_n(lbm_value *args, lbm_uint argn) {
   }
 
   lbm_value res;
-  if (lbm_create_array(&res, len + 1)) {
+  if (lbm_create_array(&res, LBM_TYPE_CHAR, len + 1)) {
     lbm_array_header_t *arr = (lbm_array_header_t*)lbm_car(res);
     memcpy(arr->data, buffer, len);
     ((char*)(arr->data))[len] = '\0';
@@ -101,12 +97,12 @@ static lbm_value ext_str_merge(lbm_value *args, lbm_uint argn) {
     if (str) {
       len_tot += strlen(str);
     } else {
-      return ENC_SYM_TERROR;
+      return ENC_SYM_EERROR;
     }
   }
 
   lbm_value res;
-  if (lbm_create_array(&res, len_tot + 1)) {
+  if (lbm_create_array(&res, LBM_TYPE_CHAR, len_tot + 1)) {
     lbm_array_header_t *arr = (lbm_array_header_t*)lbm_car(res);
     unsigned int offset = 0;
     for (unsigned int i = 0;i < argn;i++) {
@@ -121,36 +117,34 @@ static lbm_value ext_str_merge(lbm_value *args, lbm_uint argn) {
 
 static lbm_value ext_str_to_i(lbm_value *args, lbm_uint argn) {
   if (argn != 1 && argn != 2) {
-    lbm_set_error_reason((char*)lbm_error_str_num_args);
     return ENC_SYM_EERROR;
   }
 
   char *str = lbm_dec_str(args[0]);
   if (!str) {
-    return ENC_SYM_TERROR;
+    return ENC_SYM_EERROR;
   }
 
   int base = 0;
   if (argn == 2) {
     if (!lbm_is_number(args[1])) {
-      return ENC_SYM_TERROR;
+      return ENC_SYM_EERROR;
     }
 
     base = (int)lbm_dec_as_u32(args[1]);
   }
 
-  return lbm_enc_i32((int32_t)strtol(str, NULL, base));
+  return lbm_enc_i32(strtol(str, NULL, base));
 }
 
 static lbm_value ext_str_to_f(lbm_value *args, lbm_uint argn) {
   if (argn != 1) {
-    lbm_set_error_reason((char*)lbm_error_str_num_args);
     return ENC_SYM_EERROR;
   }
 
   char *str = lbm_dec_str(args[0]);
   if (!str) {
-    return ENC_SYM_TERROR;
+    return ENC_SYM_EERROR;
   }
 
   return lbm_enc_float(strtof(str, NULL));
@@ -158,34 +152,33 @@ static lbm_value ext_str_to_f(lbm_value *args, lbm_uint argn) {
 
 static lbm_value ext_str_part(lbm_value *args, lbm_uint argn) {
   if ((argn != 2 && argn != 3) || !lbm_is_number(args[1])) {
-    lbm_set_error_reason((char*)lbm_error_str_num_args);
-    return ENC_SYM_TERROR;
+    return ENC_SYM_EERROR;
   }
 
   char *str = lbm_dec_str(args[0]);
   if (!str) {
-    return ENC_SYM_TERROR;
+    return ENC_SYM_EERROR;
   }
 
-  uint32_t len = (uint32_t)strlen(str);
+  size_t len = strlen(str);
 
-  uint32_t start = lbm_dec_as_u32(args[1]);
+  unsigned int start = lbm_dec_as_u32(args[1]);
 
   if (start >= len) {
     return ENC_SYM_EERROR;
   }
 
-  uint32_t n = len - start;
+  unsigned int n = len - start;
   if (argn == 3) {
     if (!lbm_is_number(args[2])) {
-      return ENC_SYM_TERROR;
+      return ENC_SYM_EERROR;
     }
 
     n = MIN(lbm_dec_as_u32(args[2]), n);
   }
 
   lbm_value res;
-  if (lbm_create_array(&res, n + 1)) {
+  if (lbm_create_array(&res, LBM_TYPE_CHAR, n + 1)) {
     lbm_array_header_t *arr = (lbm_array_header_t*)lbm_car(res);
     memcpy(arr->data, str + start, n);
     ((char*)(arr->data))[n] = '\0';
@@ -197,13 +190,12 @@ static lbm_value ext_str_part(lbm_value *args, lbm_uint argn) {
 
 static lbm_value ext_str_split(lbm_value *args, lbm_uint argn) {
   if (argn != 2) {
-    lbm_set_error_reason((char*)lbm_error_str_num_args);
     return ENC_SYM_EERROR;
   }
 
   char *str = lbm_dec_str(args[0]);
   if (!str) {
-    return ENC_SYM_TERROR;
+    return ENC_SYM_EERROR;
   }
 
   char *split = lbm_dec_str(args[1]);
@@ -211,41 +203,45 @@ static lbm_value ext_str_split(lbm_value *args, lbm_uint argn) {
   if (!split) {
     if (lbm_is_number(args[1])) {
       step = MAX(lbm_dec_as_i32(args[1]), 1);
-      lbm_value res = ENC_SYM_NIL;
-      int len = (int)strlen(str);
-      for (int i = len / step;i >= 0;i--) {
-        int ind_now = i * step;
-        if (ind_now >= len) {
-          continue;
-        }
-
-        int step_now = step;
-        while ((ind_now + step_now) > len) {
-          step_now--;
-        }
-
-        lbm_value tok;
-        if (lbm_create_array(&tok, (lbm_uint)step_now + 1)) {
-          lbm_array_header_t *arr = (lbm_array_header_t*)lbm_car(tok);
-          memcpy(arr->data, str + ind_now, (unsigned int)step_now);
-          ((char*)(arr->data))[step_now] = '\0';
-          res = lbm_cons(tok, res);
-        } else {
-          return ENC_SYM_MERROR;
-        }
-      }
-      return res;
     } else {
-      return ENC_SYM_TERROR;
+      return ENC_SYM_EERROR;
     }
+  }
+
+  if (step > 0) {
+    lbm_value res = ENC_SYM_NIL;
+    int len = (int)strlen(str);
+    for (int i = len / step;i >= 0;i--) {
+      int ind_now = i * step;
+      if (ind_now >= len) {
+        continue;
+      }
+
+      int step_now = step;
+      while ((ind_now + step_now) > len) {
+        step_now--;
+      }
+
+      lbm_value tok;
+      if (lbm_create_array(&tok, LBM_TYPE_CHAR, (lbm_uint)step_now + 1)) {
+        lbm_array_header_t *arr = (lbm_array_header_t*)lbm_car(tok);
+        memcpy(arr->data, str + ind_now, (unsigned int)step_now);
+        ((char*)(arr->data))[step_now] = '\0';
+        res = lbm_cons(tok, res);
+      } else {
+        return ENC_SYM_MERROR;
+      }
+    }
+
+    return res;
   } else {
-     lbm_value res = ENC_SYM_NIL;
+    lbm_value res = ENC_SYM_NIL;
     const char *s = str;
     while (*(s += strspn(s, split)) != '\0') {
       size_t len = strcspn(s, split);
 
       lbm_value tok;
-      if (lbm_create_array(&tok, len + 1)) {
+      if (lbm_create_array(&tok, LBM_TYPE_CHAR, len + 1)) {
         lbm_array_header_t *arr = (lbm_array_header_t*)lbm_car(tok);
         memcpy(arr->data, s, len);
         ((char*)(arr->data))[len] = '\0';
@@ -253,16 +249,16 @@ static lbm_value ext_str_split(lbm_value *args, lbm_uint argn) {
       } else {
         return ENC_SYM_MERROR;
       }
+
       s += len;
     }
+
     return lbm_list_destructive_reverse(res);
   }
 }
 
-// Todo: Clean this up for 64bit
 static lbm_value ext_str_replace(lbm_value *args, lbm_uint argn) {
   if (argn != 2 && argn != 3) {
-    lbm_set_error_reason((char*)lbm_error_str_num_args);
     return ENC_SYM_EERROR;
   }
 
@@ -285,7 +281,7 @@ static lbm_value ext_str_replace(lbm_value *args, lbm_uint argn) {
   }
 
   // See https://stackoverflow.com/questions/779875/what-function-is-to-replace-a-substring-from-a-string-in-c
-  //char *result; // the return string
+  char *result; // the return string
   char *ins;    // the next insert point
   char *tmp;    // varies
   size_t len_rep;  // length of rep (the string to remove)
@@ -308,9 +304,9 @@ static lbm_value ext_str_replace(lbm_value *args, lbm_uint argn) {
 
   size_t len_res = strlen(orig) + (len_with - len_rep) * (unsigned int)count + 1;
   lbm_value lbm_res;
-  if (lbm_create_array(&lbm_res, len_res)) {
+  if (lbm_create_array(&lbm_res, LBM_TYPE_CHAR, len_res)) {
     lbm_array_header_t *arr = (lbm_array_header_t*)lbm_car(lbm_res);
-    tmp = (char*)arr->data;
+    tmp = result = (char*)arr->data;
   } else {
     return ENC_SYM_MERROR;
   }
@@ -334,7 +330,6 @@ static lbm_value ext_str_replace(lbm_value *args, lbm_uint argn) {
 
 static lbm_value ext_str_to_lower(lbm_value *args, lbm_uint argn) {
   if (argn != 1) {
-    lbm_set_error_reason((char*)lbm_error_str_num_args);
     return ENC_SYM_EERROR;
   }
 
@@ -345,7 +340,7 @@ static lbm_value ext_str_to_lower(lbm_value *args, lbm_uint argn) {
 
   size_t len = strlen(orig);
   lbm_value lbm_res;
-  if (lbm_create_array(&lbm_res, len + 1)) {
+  if (lbm_create_array(&lbm_res, LBM_TYPE_CHAR, len + 1)) {
     lbm_array_header_t *arr = (lbm_array_header_t*)lbm_car(lbm_res);
     for (unsigned int i = 0;i < len;i++) {
       ((char*)(arr->data))[i] = (char)tolower(orig[i]);
@@ -359,7 +354,6 @@ static lbm_value ext_str_to_lower(lbm_value *args, lbm_uint argn) {
 
 static lbm_value ext_str_to_upper(lbm_value *args, lbm_uint argn) {
   if (argn != 1) {
-    lbm_set_error_reason((char*)lbm_error_str_num_args);
     return ENC_SYM_EERROR;
   }
 
@@ -370,7 +364,7 @@ static lbm_value ext_str_to_upper(lbm_value *args, lbm_uint argn) {
 
   int len = (int)strlen(orig);
   lbm_value lbm_res;
-  if (lbm_create_array(&lbm_res, (lbm_uint)len + 1)) {
+  if (lbm_create_array(&lbm_res, LBM_TYPE_CHAR, (lbm_uint)len + 1)) {
     lbm_array_header_t *arr = (lbm_array_header_t*)lbm_car(lbm_res);
     for (int i = 0;i < len;i++) {
       ((char*)(arr->data))[i] = (char)toupper(orig[i]);
@@ -390,12 +384,12 @@ static lbm_value ext_str_cmp(lbm_value *args, lbm_uint argn) {
 
   char *str1 = lbm_dec_str(args[0]);
   if (!str1) {
-    return ENC_SYM_TERROR;
+    return ENC_SYM_EERROR;
   }
 
   char *str2 = lbm_dec_str(args[1]);
   if (!str2) {
-    return ENC_SYM_TERROR;
+    return ENC_SYM_EERROR;
   }
 
   int n = -1;
@@ -414,12 +408,10 @@ static lbm_value ext_str_cmp(lbm_value *args, lbm_uint argn) {
   }
 }
 
-
-
 // TODO: This is very similar to ext-print. Maybe they can share code.
 static lbm_value to_str(char *delimiter, lbm_value *args, lbm_uint argn) {
   const int str_len = 300;
-  char *str = lbm_malloc((lbm_uint)str_len);
+  char *str = lbm_malloc(str_len);
   if (!str) {
     return ENC_SYM_MERROR;
   }
@@ -430,32 +422,57 @@ static lbm_value to_str(char *delimiter, lbm_value *args, lbm_uint argn) {
     lbm_value t = args[i];
     int max = str_len - str_ofs - 1;
 
-    char *arr_str;
-    int chars = 0;
-
-    if (lbm_value_is_printable_string(t, &arr_str)) {
-      if (str_ofs == 0) {
-        chars = snprintf(str + str_ofs, (unsigned int)max, "%s", arr_str);
-      } else {
-        chars = snprintf(str + str_ofs, (unsigned int)max, "%s%s", delimiter, arr_str);
+    if (lbm_is_ptr(t) && lbm_type_of(t) == LBM_TYPE_ARRAY) {
+      lbm_array_header_t *array = (lbm_array_header_t *)lbm_car(t);
+      switch (array->elt_type){
+      case LBM_TYPE_CHAR: {
+        int chars = 0;
+        if (str_ofs == 0) {
+          chars = snprintf(str + str_ofs, (unsigned int)max, "%s", (char*)array->data);
+        } else {
+          chars = snprintf(str + str_ofs, (unsigned int)max, "%s%s", delimiter, (char*)array->data);
+        }
+        if (chars >= max) {
+          str_ofs += max;
+        } else {
+          str_ofs += chars;
+        }
+      } break;
+      default:
+        return ENC_SYM_NIL;
+        break;
       }
-    } else {
+    } else if (lbm_type_of(t) == LBM_TYPE_CHAR) {
+      int chars = 0;
+      if (str_ofs == 0) {
+        chars = snprintf(str + str_ofs, (unsigned int)max, "%c", lbm_dec_char(t));
+      } else {
+        chars = snprintf(str + str_ofs, (unsigned int)max, "%s%c", delimiter, lbm_dec_char(t));
+      }
+      if (chars >= max) {
+        str_ofs += max;
+      } else {
+        str_ofs += chars;
+      }
+    }  else {
       lbm_print_value(print_val_buffer, 256, t);
+
+      int chars = 0;
       if (str_ofs == 0) {
         chars = snprintf(str + str_ofs, (unsigned int)max, "%s", print_val_buffer);
       } else {
         chars = snprintf(str + str_ofs, (unsigned int)max, "%s%s", delimiter, print_val_buffer);
       }
-    }
-    if (chars >= max) {
-      str_ofs += max;
-    } else {
-      str_ofs += chars;
+      if (chars >= max) {
+        str_ofs += max;
+      } else {
+        str_ofs += chars;
       }
+    }
   }
 
   lbm_value res;
-  if (lbm_create_array(&res, (lbm_uint)str_ofs + 1)) {
+  if (lbm_create_array(&res, LBM_TYPE_CHAR, (lbm_uint)str_ofs + 1)) {
     lbm_array_header_t *arr = (lbm_array_header_t*)lbm_car(res);
     strncpy((char*)arr->data, str, (unsigned int)str_ofs + 1);
     lbm_free(str);
@@ -472,13 +489,12 @@ static lbm_value ext_to_str(lbm_value *args, lbm_uint argn) {
 
 static lbm_value ext_to_str_delim(lbm_value *args, lbm_uint argn) {
   if (argn < 1) {
-    lbm_set_error_reason((char*)lbm_error_str_num_args);
     return ENC_SYM_EERROR;
   }
 
   char *delim = lbm_dec_str(args[0]);
   if (!delim) {
-    return ENC_SYM_TERROR;
+    return ENC_SYM_EERROR;
   }
 
   return to_str(delim, args + 1, argn - 1);
@@ -489,40 +505,12 @@ static lbm_value ext_str_len(lbm_value *args, lbm_uint argn) {
 
   char *str = lbm_dec_str(args[0]);
   if (!str) {
-    return ENC_SYM_TERROR;
+    return ENC_SYM_EERROR;
   }
 
   lbm_array_header_t *array = (lbm_array_header_t *)lbm_car(args[0]);
 
   return lbm_enc_i((int)strlen_max(str, array->size));
-}
-
-static lbm_value ext_str_replicate(lbm_value *args, lbm_uint argn) {
-  if (argn != 2) {
-    lbm_set_error_reason((char*)lbm_error_str_num_args);
-    return ENC_SYM_EERROR;
-  }
-
-  lbm_value res = ENC_SYM_TERROR;
-
-  if (lbm_is_number(args[0]) &&
-      lbm_is_number(args[1])) {
-    uint32_t len = lbm_dec_as_u32(args[0]);
-    uint8_t c = lbm_dec_as_char(args[1]);
-
-    lbm_value lbm_res;
-    if (lbm_create_array(&lbm_res, len + 1)) {
-      lbm_array_header_t *arr = (lbm_array_header_t*)lbm_car(lbm_res);
-      for (unsigned int i = 0;i < len;i++) {
-        ((char*)(arr->data))[i] = (char)c;
-      }
-      ((char*)(arr->data))[len] = '\0';
-      res = lbm_res;
-    } else {
-      res = ENC_SYM_MERROR;
-    }
-  }
-  return res;
 }
 
 
@@ -543,7 +531,6 @@ bool lbm_string_extensions_init(void) {
   res = res && lbm_add_extension("to-str", ext_to_str);
   res = res && lbm_add_extension("to-str-delim", ext_to_str_delim);
   res = res && lbm_add_extension("str-len", ext_str_len);
-  res = res && lbm_add_extension("str-replicate", ext_str_replicate);
 
   return res;
 }

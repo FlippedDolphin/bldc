@@ -17,9 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
     */
 
-#pragma GCC push_options
-#pragma GCC optimize ("Os")
-
 #include "app.h"
 #include "ch.h"
 #include "hal.h"
@@ -56,8 +53,17 @@ static volatile chuk_config config;
 static volatile bool output_running = false;
 static volatile systime_t last_update_time;
 
+// Private functions
+static void terminal_cmd_nunchuk_status(int argc, const char **argv);
+
 void app_nunchuk_configure(chuk_config *conf) {
 	config = *conf;
+
+	terminal_register_command_callback(
+			"nunchuk_status",
+			"Print the status of the nunchuk app",
+			0,
+			terminal_cmd_nunchuk_status);
 }
 
 void app_nunchuk_start(void) {
@@ -350,15 +356,15 @@ static THD_FUNCTION(output_thread, arg) {
 
 		if (config.ctrl_type == CHUK_CTRL_TYPE_CURRENT_BIDIRECTIONAL) {
 			if ((out_val > 0.0 && duty_now > 0.0) || (out_val < 0.0 && duty_now < 0.0)) {
-				current = out_val * mcconf->lo_current_max;
+				current = out_val * mcconf->lo_current_motor_max_now;
 			} else {
-				current = out_val * fabsf(mcconf->lo_current_min);
+				current = out_val * fabsf(mcconf->lo_current_motor_min_now);
 			}
 		} else {
 			if (out_val >= 0.0 && ((is_reverse ? -1.0 : 1.0) * duty_now) > 0.0) {
-				current = out_val * mcconf->lo_current_max;
+				current = out_val * mcconf->lo_current_motor_max_now;
 			} else {
-				current = out_val * fabsf(mcconf->lo_current_min);
+				current = out_val * fabsf(mcconf->lo_current_motor_min_now);
 			}
 		}
 
@@ -529,4 +535,11 @@ static THD_FUNCTION(output_thread, arg) {
 	}
 }
 
-#pragma GCC pop_options
+static void terminal_cmd_nunchuk_status(int argc, const char **argv) {
+	(void)argc;
+	(void)argv;
+
+	commands_printf("Nunchuk Status");
+	commands_printf("Output: %s", output_running ? "On" : "Off");
+	commands_printf(" ");
+}
